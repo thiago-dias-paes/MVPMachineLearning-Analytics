@@ -10,7 +10,7 @@ Este repositório contém o notebook utilizado no projeto de Machine Learning & 
 
 ## Contexto
 
-Este projeto é a continuação direta do [MVP 1 — Análise de Dados e Boas Práticas](https://github.com/thiago-dias-paes/MVPAnalisedeDadoseBoasPraticas), que identificou 2 famílias de modelagem (clusters) a partir de perfis sazonais similares entre 50 SKUs de uma loja. O MVP 1 respondeu *"quais itens podem ser modelados conjuntamente?"*. Este MVP responde à pergunta seguinte: *"qual modelo de previsão entrega a melhor acurácia para cada família, e esse resultado é confiável e estatisticamente robusto?"*
+Este projeto é a continuação direta do MVP 1 — Análise de Dados e Boas Práticas, que identificou 2 famílias de modelagem (clusters) a partir de perfis sazonais similares entre 50 SKUs de uma loja. O MVP 1 respondeu "quais itens podem ser modelados conjuntamente?". Este MVP responde à pergunta seguinte: "qual modelo de previsão entrega a melhor acurácia para cada família, e esse resultado é confiável e estatisticamente robusto?"
 
 Em S&OP, erros de previsão se propagam por toda a cadeia — compras, produção, estoque e finanças. A abordagem de modelagem por cluster com desagregação via mix histórico só se justifica se for competitiva com a modelagem individual por SKU. Este MVP testa essa premissa empiricamente, incluindo validação de robustez temporal (backtesting) e significância estatística das comparações entre modelos.
 
@@ -27,25 +27,35 @@ Este projeto testa 4 hipóteses centrais:
 
 ## Principais Resultados
 
-**H1 — Modelos sazonais superam modelos simples?**
-✅ Confirmada. O Holt-Winters superou SES e Holt por margens de 13 a 20 pontos percentuais de MAPE em ambos os clusters, confirmando que a sazonalidade anual (amplitude de ~60%) é a componente dominante do portfólio.
+**H1 — Modelos sazonais superam modelos simples?** ✅ Confirmada. O Holt-Winters superou SES e Holt por margens de 13 a 20 pontos percentuais de MAPE em ambos os clusters, confirmando que a sazonalidade anual (amplitude de ~60%) é a componente dominante do portfólio.
 
-**H2 — Cluster + Mix supera a modelagem individual por SKU?**
-✅ Confirmada. MAPE médio de 3,37% (cluster + mix) contra 4,30% (naive individual por item) — ganho de +0,93pp, com 43 dos 50 itens beneficiados pela abordagem agregada.
+**H2 — Cluster + Mix supera a modelagem individual por SKU?** ✅ Confirmada. MAPE médio de 3,37% (cluster + mix) contra 4,30% (naive individual por item) — ganho de +0,93pp, com 43 dos 50 itens beneficiados pela abordagem agregada.
 
-**H3 — Otimização de hiperparâmetros supera o baseline em ≥10pp?**
-⚠ Não confirmada. O ganho observado foi de apenas +0,68pp e +0,88pp sobre o Naive Sazonal. A causa raiz está conectada à alta homogeneidade sazonal do portfólio identificada no MVP 1 (correlação média de 0,996 entre SKUs): como o padrão de vendas se repete de forma muito regular ano após ano, o próprio baseline naive já é extremamente competitivo (MAPE de 3,6% e 3,3%), deixando pouca margem de melhoria percentual.
+**H3 — Otimização de hiperparâmetros supera o baseline em ≥10pp?** ⚠ Não confirmada. O ganho observado foi de apenas +0,68pp e +0,88pp sobre o Naive Sazonal. A causa raiz está conectada à alta homogeneidade sazonal do portfólio identificada no MVP 1 (correlação média de 0,996 entre SKUs): como o padrão de vendas se repete de forma muito regular ano após ano, o próprio baseline naive já é extremamente competitivo (MAPE de 3,6% e 3,3%), deixando pouca margem de melhoria percentual.
 
-**H4 — XGBoost melhora em horizontes de previsão mais curtos?**
-❌ Não confirmada — resultado inconclusivo por confundimento no desenho do teste. O MAPE piorou (não melhorou) em horizontes curtos para XGBoost e também para o Holt-Winters, revelando que o efeito é causado pela alta volatilidade do mês de janeiro (vale sazonal) isolado no horizonte de 1 mês, e não pela acumulação de erro recursivo do XGBoost.
+**H4 — XGBoost melhora em horizontes de previsão mais curtos?** ❌ Não confirmada — resultado inconclusivo por confundimento no desenho do teste inicial. O MAPE piorou (não melhorou) em horizontes curtos para XGBoost e também para o Holt-Winters, revelando que o efeito era causado pela alta volatilidade do mês de janeiro (vale sazonal) isolado no horizonte de 1 mês. Um teste controlado adicional, cobrindo 35 origens mensais distintas por cluster, confirmou a ausência de correlação entre horizonte de previsão e erro (Spearman não significativo em ambos os clusters) — refutando definitivamente a hipótese de acumulação de erro recursivo.
 
-| Modelo vencedor | Cluster 0 | Cluster 1 | Robustez (CV backtesting) |
-|---|---|---|---|
-| Holt-Winters (add, add, período 12) | MAPE 2,91% | MAPE 2,46% | 32,3% / 28,9% |
+| Modelo vencedor | Cluster 0 | Cluster 1 | Robustez (CV backtesting) | Significância vs. XGBoost (N=365) |
+|---|---|---|---|---|
+| Holt-Winters (add, add, período 12) | MAPE 2,91% | MAPE 2,46% | 32,3% / 28,9% | p < 0,001 (ambos) |
 
-O **teste de Wilcoxon** mostrou que a diferença de MAPE entre Holt-Winters e XGBoost não é estatisticamente significativa em nenhum dos clusters (p = 0,30 e p = 0,11) — a escolha do modelo final é justificada por simplicidade computacional e ausência de acumulação de erro, não por superioridade estatística comprovada. O **backtesting em 3 janelas temporais** indica que o MAPE real esperado em produção deve ser comunicado como uma faixa (2,5%–4,9%), não como valor fixo.
+O teste de Wilcoxon inicial (12 observações do holdout 2017) não mostrou diferença estatisticamente significativa entre Holt-Winters e XGBoost (p = 0,30 e p = 0,11). Para resolver essa limitação de poder estatístico, o notebook realiza um backtesting com múltiplas origens mensais (35 origens × cluster, XGBoost retreinado a cada origem sem vazamento de dados), ampliando a amostra para 365 pares por cluster. Com essa amostra ampliada, a superioridade do Holt-Winters se confirma como estatisticamente significativa (p < 0,001 em ambos os clusters) — embora, por rigor, vale notar que essas observações não são totalmente independentes entre si (janelas de origem sobrepostas), o que pode inflar levemente a significância reportada.
 
-A abordagem mantém a redução de **96% no esforço de modelagem** (50 modelos individuais → 2 famílias), agora validada com testes estatísticos de robustez.
+A escolha do modelo final é justificada tanto por simplicidade computacional e ausência de acumulação de erro recursivo quanto, agora, por evidência estatística mais robusta de superioridade de acurácia. O backtesting em 3 janelas temporais indica que o MAPE real esperado em produção deve ser comunicado como uma faixa (2,5%–4,9%), não como valor fixo.
+
+A abordagem mantém a redução de 96% no esforço de modelagem (50 modelos individuais → 2 famílias), agora validada com testes estatísticos de robustez em amostra ampliada.
+
+## Limitações
+
+- CV do MAPE entre janelas de backtesting ≈ 30% — o resultado de 2017 está no extremo favorável do intervalo esperado (2,5%–4,9%), não devendo ser comunicado como número fixo.
+- A amostra do teste de Wilcoxon ampliado (365 obs.) apresenta autocorrelação por sobreposição de origens mensais — ver nota metodológica detalhada no notebook, Seção 9.
+- Modelos univariados: sem variáveis exógenas (promoções, feriados) — não disponíveis no dataset.
+- Mix histórico calculado de forma estática sobre 2013–2017; revisão periódica é recomendada em produção.
+- Escopo restrito à Loja 1 — generalização para as demais 9 lojas é etapa futura.
+
+## Reprodutibilidade
+
+O notebook é autocontido: carrega os dados via URL pública, reconstrói os clusters do MVP 1 com os mesmos parâmetros (K=2, seed=42) e mede seu próprio tempo total de execução ao final, validando a restrição de performance definida no escopo do projeto (< 10 min no Colab/CPU).
 
 ## Técnicas Utilizadas
 
@@ -63,8 +73,8 @@ A abordagem mantém a redução de **96% no esforço de modelagem** (50 modelos 
 
 **Validação e Robustez**
 - Divisão temporal treino/validação/teste sem vazamento de dados
-- Backtesting com janela deslizante (rolling-origin) em 3 períodos
-- Teste de significância estatística de Wilcoxon (signed-rank)
+- Backtesting com janela deslizante (rolling-origin) em 3 períodos anuais e em 35 origens mensais
+- Teste de significância estatística de Wilcoxon (signed-rank), em amostra original e ampliada
 - Teste de hipótese com controle experimental (isolamento de confundimento no teste de horizonte)
 
 **Avaliação**
@@ -81,6 +91,7 @@ Store Item Demand Forecasting Challenge — Kaggle
 - 10 lojas × 50 itens × 5 anos (2013–2017)
 - Escopo utilizado: Loja 1, granularidade mensal, 50 itens
 - 🔗 https://www.kaggle.com/c/demand-forecasting-kernels-only
+
 
 ## Notebook
 
