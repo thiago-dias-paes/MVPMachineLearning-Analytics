@@ -1,4 +1,4 @@
-# MVP 2 — Machine Learning & Analytics: Forecasting de Demanda no contexto de S&OP
+# MVP — Machine Learning & Analytics: Forecasting de Demanda no contexto de S&OP
 
 Este repositório contém o notebook utilizado no projeto de Machine Learning & Analytics aplicado ao contexto de S&OP (Sales & Operations Planning), com foco em treinar, comparar e validar estatisticamente modelos de previsão de séries temporais para as famílias de modelagem identificadas no MVP 1.
 
